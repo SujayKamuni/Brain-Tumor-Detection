@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Brain Tumor Detection</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; }
+        .upload-area { border: 2px dashed #3498db; padding: 40px; text-align: center; border-radius: 10px; cursor: pointer; transition: 0.3s; margin-bottom: 20px;}
+        .upload-area:hover { background: #eef2f5; }
+        input[type="file"] { display: none; }
+        button { background: #3498db; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; transition: 0.3s;}
+        button:hover { background: #2980b9; }
+        .result { margin-top: 30px; display: none;}
+        .result h3 { color: #e74c3c; }
+        .heatmap-container { text-align: center; margin-top: 20px; }
+        img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .safe { color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Brain Tumor Detector</h1>
+        <form id="upload-form">
+            <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                <p id="file-name">Click here to upload an MRI Scan (JPG/PNG)</p>
+            </div>
+            <input type="file" id="file-input" name="file" accept="image/*" required onchange="document.getElementById('file-name').innerText = this.files[0].name">
+            <button type="submit" id="analyze-btn">Analyze MRI</button>
+        </form>
+
+        <div class="result" id="result-box">
+            <h3 id="res-status"></h3>
+            <p id="res-details"></p>
+            <div class="heatmap-container" id="gradcam-container" style="display: none;">
+                <h4>Grad-CAM Analysis Overlay</h4>
+                <img id="overlay-img" alt="GradCAM Overlay">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("upload-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("analyze-btn");
+            btn.innerText = "Analyzing...";
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append("file", document.getElementById("file-input").files[0]);
+
+            try {
+                const response = await fetch("/predict", { method: "POST", body: formData });
+                const data = await response.json();
+                
+                const resBox = document.getElementById("result-box");
+                const resStatus = document.getElementById("res-status");
+                const resDetails = document.getElementById("res-details");
+                const overlayImg = document.getElementById("overlay-img");
+                const gradcamContainer = document.getElementById("gradcam-container");
+                
+                resBox.style.display = "block";
+                
+                if (data.has_tumor) {
+                    resStatus.className = "";
+                    resStatus.style.color = "#e74c3c";
+                    resStatus.innerText = "⚠️ Tumor Detected!";
+                    resDetails.innerHTML = `<strong>Type:</strong> ${data.type} <br><strong>Detection Confidence:</strong> ${data.confidence}% <br><strong>Classification Confidence:</strong> ${data.type_confidence}%`;
+                    
+                    if (data.overlay_base64) {
+                        overlayImg.src = "data:image/jpeg;base64," + data.overlay_base64;
+                        gradcamContainer.style.display = "block";
+                    }
+                } else {
+                    resStatus.className = "safe";
+                    resStatus.style.color = "#2ecc71";
+                    resStatus.innerText = "✅ No Tumor Detected";
+                    resDetails.innerHTML = `<strong>Confidence:</strong> ${data.confidence}%`;
+                    gradcamContainer.style.display = "none";
+                }
+            } catch (err) {
+                alert("Error connecting to server!");
+            }
+
+            btn.innerText = "Analyze MRI";
+            btn.disabled = false;
+        });
+    </script>
+</body>
+</html>
